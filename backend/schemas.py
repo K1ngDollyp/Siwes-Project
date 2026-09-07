@@ -46,6 +46,7 @@ class RoomOut(BaseModel):
     member_count: int = 0
     is_member: bool = False
     user_role: Optional[str] = None
+    join_request_status: Optional[str] = None  # None | "pending" | "approved" | "rejected"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -64,6 +65,19 @@ class RoomMemberOut(BaseModel):
 
 class RoleUpdate(BaseModel):
     role: str = Field(..., pattern="^(admin|member)$")
+
+
+# --- Join Requests Schemas ---
+class JoinRequestOut(BaseModel):
+    id: UUID
+    room_id: UUID
+    user_id: UUID
+    username: str
+    email: EmailStr
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Message & Reply Schemas ---

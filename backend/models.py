@@ -113,3 +113,23 @@ class Message(Base):
     parent_message: Mapped[Optional["Message"]] = relationship("Message", remote_side=[id], back_populates="replies")
     replies: Mapped[List["Message"]] = relationship("Message", back_populates="parent_message")
 
+
+class RoomJoinRequest(Base):
+    __tablename__ = "room_join_requests"
+    __table_args__ = (
+        UniqueConstraint("room_id", "user_id", name="uq_request_room_user"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        GUID, primary_key=True, default=uuid.uuid4
+    )
+    room_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)  # "pending", "approved", "rejected"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    room: Mapped["Room"] = relationship("Room")
+    user: Mapped["User"] = relationship("User")
+
+

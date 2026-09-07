@@ -24,6 +24,11 @@ async function request(endpoint, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('chat_token');
+      localStorage.removeItem('chat_user');
+      window.location.reload();
+    }
     const error = new Error(data.detail || 'An error occurred while processing your request');
     error.status = response.status;
     error.data = data;
@@ -56,8 +61,20 @@ export const api = {
       body: JSON.stringify({ name, description }),
     }),
 
-  joinRoom: (roomId) =>
-    request(`/api/rooms/${roomId}/join`, {
+  requestToJoinRoom: (roomId) =>
+    request(`/api/rooms/${roomId}/join-request`, {
+      method: 'POST',
+    }),
+
+  getJoinRequests: (roomId) => request(`/api/rooms/${roomId}/join-requests`),
+
+  approveJoinRequest: (roomId, requestId) =>
+    request(`/api/rooms/${roomId}/join-requests/${requestId}/approve`, {
+      method: 'POST',
+    }),
+
+  rejectJoinRequest: (roomId, requestId) =>
+    request(`/api/rooms/${roomId}/join-requests/${requestId}/reject`, {
       method: 'POST',
     }),
 

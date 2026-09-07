@@ -1,11 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { Hash, Users, MessageSquare, UserPlus, Loader2, Reply } from 'lucide-react';
+import { Hash, Users, MessageSquare, UserPlus, Loader2, Reply, Clock, ShieldAlert } from 'lucide-react';
 import MessageInput from './MessageInput';
 
 function formatRelativeTime(timestamp) {
   if (!timestamp) return '';
 
-  // Append 'Z' to naive ISO strings without explicit timezone designation so JS parses as UTC
   let str = String(timestamp);
   if (!str.endsWith('Z') && !str.includes('+') && !str.includes('Z')) {
     str = str + 'Z';
@@ -27,7 +26,6 @@ function formatRelativeTime(timestamp) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Generate consistent avatar color based on username
 function getAvatarColor(username) {
   const colors = [
     'from-indigo-600 to-blue-600',
@@ -53,18 +51,21 @@ export default function ChatWindow({
   currentUserId,
   onSendMessage,
   onTyping,
-  onJoinRoom,
-  joining,
+  onRequestJoin,
+  requesting,
   replyingTo,
   onReplyMessage,
-  onCancelReply
+  onCancelReply,
+  pendingRequestsCount,
+  onOpenRequestsModal
 }) {
   const messagesEndRef = useRef(null);
 
-  // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingUsers]);
+
+  const isAdminOrOwner = room?.user_role === 'owner' || room?.user_role === 'admin';
 
   if (!room) {
     return (
@@ -98,13 +99,32 @@ export default function ChatWindow({
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Admin Pending Requests Button */}
+          {isAdminOrOwner && (
+            <button
+              onClick={onOpenRequestsModal}
+              className="flex items-center gap-2 text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-sm"
+              title="Review Join Requests"
+            >
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span>Requests</span>
+              {pendingRequestsCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold flex items-center justify-center">
+                  {pendingRequestsCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Online count */}
           <div className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/80">
             <Users className="w-4 h-4 text-indigo-400" />
             <span className="font-semibold">{onlineCount}</span>
             <span className="text-slate-400">online</span>
           </div>
 
+          {/* Connection status indicator */}
           <div className="flex items-center gap-2 text-xs bg-slate-950/60 px-3 py-1.5 rounded-xl border border-slate-800">
             <span
               className={`w-2.5 h-2.5 rounded-full ${
@@ -126,21 +146,39 @@ export default function ChatWindow({
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {!room.is_member ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8 select-none">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center mb-4">
-              <UserPlus className="w-8 h-8" />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">Join #{room.name}</h3>
-            <p className="text-slate-400 text-sm max-w-sm mb-6">
-              You are not a member of this room yet. Join now to view live chat and send messages!
-            </p>
-            <button
-              onClick={() => onJoinRoom(room.id)}
-              disabled={joining}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/25 flex items-center gap-2 cursor-pointer transition-all"
-            >
-              {joining && <Loader2 className="w-4 h-4 animate-spin" />}
-              Join Room
-            </button>
+            {room.join_request_status === 'pending' ? (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center mb-4 shadow-inner">
+                  <Clock className="w-8 h-8 animate-pulse" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Request Pending Approval</h3>
+                <p className="text-slate-400 text-sm max-w-md mb-6">
+                  Your request to join <span className="text-white font-semibold">#{room.name}</span> has been sent to group admins. You will gain access as soon as an admin approves your request.
+                </p>
+                <div className="px-5 py-2.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Awaiting Group Admin Review
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center mb-4 shadow-inner">
+                  <UserPlus className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Join #{room.name}</h3>
+                <p className="text-slate-400 text-sm max-w-sm mb-6">
+                  This group requires admin approval to enter. Submit a join request to get started!
+                </p>
+                <button
+                  onClick={() => onRequestJoin(room.id)}
+                  disabled={requesting}
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/25 flex items-center gap-2 cursor-pointer transition-all"
+                >
+                  {requesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                  Request to Join Room
+                </button>
+              </>
+            )}
           </div>
         ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-500 select-none">
@@ -156,7 +194,6 @@ export default function ChatWindow({
                 key={msg.id || index}
                 className={`group flex items-start gap-3 relative ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
               >
-                {/* Avatar Initials */}
                 <div
                   className={`w-9 h-9 rounded-full bg-gradient-to-tr ${getAvatarColor(
                     msg.username
@@ -165,7 +202,6 @@ export default function ChatWindow({
                   {msg.username?.[0]?.toUpperCase() || 'U'}
                 </div>
 
-                {/* Message Content Container */}
                 <div
                   className={`max-w-[70%] flex flex-col ${
                     isMe ? 'items-end' : 'items-start'
@@ -187,7 +223,6 @@ export default function ChatWindow({
                         : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-tl-none'
                     }`}
                   >
-                    {/* Quoted Parent Reply Card */}
                     {msg.reply_to && (
                       <div className="mb-2 p-2 rounded-xl bg-black/25 border-l-2 border-indigo-400 text-xs">
                         <div className="font-semibold text-indigo-300 mb-0.5">
@@ -203,7 +238,6 @@ export default function ChatWindow({
                   </div>
                 </div>
 
-                {/* Hover Reply Button */}
                 <button
                   type="button"
                   onClick={() => onReplyMessage(msg)}
@@ -219,7 +253,6 @@ export default function ChatWindow({
           })
         )}
 
-        {/* Typing indicator */}
         {typingUsers && typingUsers.length > 0 && (
           <div className="flex items-center gap-2 text-xs text-indigo-400 italic py-1 animate-pulse select-none">
             <span className="w-2 h-2 rounded-full bg-indigo-400" />
