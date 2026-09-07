@@ -16,10 +16,11 @@ if DATABASE_URL.startswith("postgresql://"):
 elif DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 
-# Create Async Engine
 engine_kwargs = {}
 if "sqlite" in DATABASE_URL:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
+elif "postgresql" in DATABASE_URL:
+    engine_kwargs["connect_args"] = {"statement_cache_size": 0}
 
 async_engine = create_async_engine(DATABASE_URL, echo=False, **engine_kwargs)
 
