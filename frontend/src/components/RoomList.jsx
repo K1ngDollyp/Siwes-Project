@@ -9,7 +9,8 @@ export default function RoomList({
   onJoinRoom,
   currentUser,
   onLogout,
-  loading
+  loading,
+  unreadCounts = {}
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,6 +93,8 @@ export default function RoomList({
         ) : (
           filteredRooms.map((room) => {
             const isActive = room.id === activeRoomId;
+            const unreadCount = unreadCounts[room.id] || 0;
+
             return (
               <div
                 key={room.id}
@@ -121,6 +124,12 @@ export default function RoomList({
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                  {unreadCount > 0 && !isActive && (
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold shadow-md shadow-indigo-600/30 animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
+
                   <span className="text-xs text-slate-400 flex items-center gap-1 bg-slate-950/40 px-2 py-0.5 rounded-md border border-slate-800">
                     <Users className="w-3 h-3 text-slate-400" />
                     {room.member_count}

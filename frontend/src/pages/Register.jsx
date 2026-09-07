@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { api } from '../api';
-import { MessageSquare, Lock, Mail, User, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, Lock, Mail, User, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 
-export default function Register({ switchToLogin }) {
+export default function Register({ switchToLogin, onRegisterSuccess }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -16,11 +16,19 @@ export default function Register({ switchToLogin }) {
     setLoading(true);
 
     try {
+      // 1. Register user
       await api.register(username, email, password);
-      setSuccess(true);
-      setTimeout(() => {
+      
+      // 2. Immediately auto-login for seamless UX
+      const loginData = await api.login(email, password);
+      localStorage.setItem('chat_token', loginData.access_token);
+      localStorage.setItem('chat_user', JSON.stringify(loginData.user));
+      
+      if (onRegisterSuccess) {
+        onRegisterSuccess(loginData.user);
+      } else {
         switchToLogin();
-      }, 1500);
+      }
     } catch (err) {
       setError(err.message || 'Registration failed. Please check details and try again.');
     } finally {
@@ -46,13 +54,6 @@ export default function Register({ switchToLogin }) {
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2">
             <span>{error}</span>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-            <span>Account registered successfully! Redirecting to login...</span>
           </div>
         )}
 
@@ -99,14 +100,22 @@ export default function Register({ switchToLogin }) {
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 6 characters"
-                className="w-full pl-11 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full pl-11 pr-11 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1"
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
 

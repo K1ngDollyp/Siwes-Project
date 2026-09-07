@@ -39,7 +39,12 @@ export default function App() {
   }
 
   if (view === 'register') {
-    return <Register switchToLogin={() => setView('login')} />;
+    return (
+      <Register
+        switchToLogin={() => setView('login')}
+        onRegisterSuccess={handleLoginSuccess}
+      />
+    );
   }
 
   return (
