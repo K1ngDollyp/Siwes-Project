@@ -17,6 +17,10 @@ async function request(endpoint, options = {}) {
     headers,
   });
 
+  if (response.status === 204) {
+    return null;
+  }
+
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
@@ -58,6 +62,17 @@ export const api = {
     }),
 
   getRoomMembers: (roomId) => request(`/api/rooms/${roomId}/members`),
+
+  updateMemberRole: (roomId, userId, role) =>
+    request(`/api/rooms/${roomId}/members/${userId}/role`, {
+      method: 'POST',
+      body: JSON.stringify({ role }),
+    }),
+
+  removeMember: (roomId, userId) =>
+    request(`/api/rooms/${roomId}/members/${userId}`, {
+      method: 'DELETE',
+    }),
 
   // Messages API
   getMessages: (roomId, limit = 50, offset = 0) =>

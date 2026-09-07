@@ -20,7 +20,7 @@ export function useWebSocket(roomId, token) {
     return `${wsProtocol}://${host}/api/ws/${roomId}?token=${encodeURIComponent(token)}`;
   }, [roomId, token]);
 
-  // Handle incoming messages
+  // Handle incoming message payloads
   const handleMessagePayload = useCallback((data) => {
     switch (data.type) {
       case 'history':
@@ -34,12 +34,10 @@ export function useWebSocket(roomId, token) {
 
       case 'message':
         setMessages((prev) => {
-          // Avoid duplicate messages by ID
           if (prev.some((m) => m.id === data.id)) return prev;
           return [...prev, data];
         });
 
-        // Remove sender from typing indicator when message received
         if (data.user_id) {
           setTypingUsers((prev) => {
             const next = { ...prev };
@@ -56,12 +54,10 @@ export function useWebSocket(roomId, token) {
             [data.user_id]: data.username,
           }));
 
-          // Clear existing timer for user
           if (typingTimerRefs.current[data.user_id]) {
             clearTimeout(typingTimerRefs.current[data.user_id]);
           }
 
-          // Auto clear typing status after 3 seconds
           typingTimerRefs.current[data.user_id] = setTimeout(() => {
             setTypingUsers((prev) => {
               const next = { ...prev };
@@ -73,11 +69,6 @@ export function useWebSocket(roomId, token) {
         break;
 
       case 'user_joined':
-        if (data.online_users) {
-          setOnlineUsers(data.online_users);
-        }
-        break;
-
       case 'user_left':
         if (data.online_users) {
           setOnlineUsers(data.online_users);
@@ -132,7 +123,6 @@ export function useWebSocket(roomId, token) {
         if (!isMounted) return;
         setStatus('disconnected');
         
-        // Attempt reconnect after 3 seconds if not closed cleanly intentionally
         if (event.code !== 1000) {
           reconnectTimeoutRef.current = setTimeout(() => {
             if (isMounted) connectWS();
@@ -156,12 +146,13 @@ export function useWebSocket(roomId, token) {
   }, [roomId, token, getWsUrl, handleMessagePayload]);
 
   // Action methods
-  const sendMessage = useCallback((content) => {
+  const sendMessage = useCallback((content, replyToId = null) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(
         JSON.stringify({
           type: 'message',
           content,
+          reply_to_id: replyToId,
         })
       );
     }

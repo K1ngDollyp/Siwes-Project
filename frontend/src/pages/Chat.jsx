@@ -11,6 +11,7 @@ export default function Chat({ currentUser, onLogout }) {
   const [roomMembers, setRoomMembers] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [joiningRoomId, setJoiningRoomId] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
 
   const token = localStorage.getItem('chat_token');
 
@@ -38,7 +39,6 @@ export default function Chat({ currentUser, onLogout }) {
         } else if (!activeRoom) {
           setActiveRoom(data[0]);
         } else {
-          // Update active room stats
           const updatedActive = data.find((r) => r.id === activeRoom.id);
           if (updatedActive) setActiveRoom(updatedActive);
         }
@@ -67,6 +67,7 @@ export default function Chat({ currentUser, onLogout }) {
 
   useEffect(() => {
     if (activeRoom?.id) {
+      setReplyingTo(null);
       loadRoomMembers(activeRoom.id);
     }
   }, [activeRoom?.id, loadRoomMembers]);
@@ -83,9 +84,17 @@ export default function Chat({ currentUser, onLogout }) {
       setJoiningRoomId(roomId);
       const joinedRoom = await api.joinRoom(roomId);
       setRooms((prev) =>
-        prev.map((r) => (r.id === roomId ? { ...r, is_member: true, member_count: joinedRoom.member_count } : r))
+        prev.map((r) =>
+          r.id === roomId
+            ? { ...r, is_member: true, member_count: joinedRoom.member_count, user_role: joinedRoom.user_role }
+            : r
+        )
       );
-      setActiveRoom((prev) => (prev?.id === roomId ? { ...prev, is_member: true, member_count: joinedRoom.member_count } : prev));
+      setActiveRoom((prev) =>
+        prev?.id === roomId
+          ? { ...prev, is_member: true, member_count: joinedRoom.member_count, user_role: joinedRoom.user_role }
+          : prev
+      );
       await loadRoomMembers(roomId);
     } catch (err) {
       console.error('Failed to join room:', err);
@@ -94,13 +103,31 @@ export default function Chat({ currentUser, onLogout }) {
     }
   };
 
+  // Update member role handler
+  const handleUpdateRole = async (userId, newRole) => {
+    if (!activeRoom?.id) return;
+    await api.updateMemberRole(activeRoom.id, userId, newRole);
+    await loadRoomMembers(activeRoom.id);
+  };
+
+  // Remove member handler
+  const handleRemoveMember = async (userId) => {
+    if (!activeRoom?.id) return;
+    await api.removeMember(activeRoom.id, userId);
+    await loadRoomMembers(activeRoom.id);
+    await loadRooms(activeRoom.id);
+  };
+
   return (
     <div className="flex h-screen w-screen bg-slate-950 overflow-hidden font-sans antialiased">
       {/* Left Sidebar - Rooms List */}
       <RoomList
         rooms={rooms}
         activeRoomId={activeRoom?.id}
-        onSelectRoom={(room) => setActiveRoom(room)}
+        onSelectRoom={(room) => {
+          setActiveRoom(room);
+          setReplyingTo(null);
+        }}
         onCreateRoom={handleCreateRoom}
         onJoinRoom={handleJoinRoom}
         currentUser={currentUser}
@@ -120,6 +147,15 @@ export default function Chat({ currentUser, onLogout }) {
         onTyping={sendTyping}
         onJoinRoom={handleJoinRoom}
         joining={joiningRoomId === activeRoom?.id}
+        replyingTo={replyingTo}
+        onReplyMessage={(msg) =>
+          setReplyingTo({
+            id: msg.id,
+            username: msg.username,
+            content: msg.content,
+          })
+        }
+        onCancelReply={() => setReplyingTo(null)}
       />
 
       {/* Right Sidebar - Online Users in Active Room */}
@@ -128,6 +164,9 @@ export default function Chat({ currentUser, onLogout }) {
           members={roomMembers}
           onlineUserIds={onlineUsers}
           currentUserId={currentUser?.id}
+          userRole={activeRoom.user_role}
+          onUpdateRole={handleUpdateRole}
+          onRemoveMember={handleRemoveMember}
         />
       )}
     </div>

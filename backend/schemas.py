@@ -45,6 +45,7 @@ class RoomOut(BaseModel):
     created_at: datetime
     member_count: int = 0
     is_member: bool = False
+    user_role: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -55,14 +56,26 @@ class RoomMemberOut(BaseModel):
     user_id: UUID
     username: str
     email: EmailStr
+    role: str = "member"  # "owner", "admin", "member"
     joined_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- Message Schemas ---
+class RoleUpdate(BaseModel):
+    role: str = Field(..., pattern="^(admin|member)$")
+
+
+# --- Message & Reply Schemas ---
+class ReplyToPreview(BaseModel):
+    id: UUID
+    username: str
+    content: str
+
+
 class MessageCreate(BaseModel):
     content: str = Field(..., min_length=1)
+    reply_to_id: Optional[UUID] = None
 
 
 class MessageOut(BaseModel):
@@ -71,6 +84,8 @@ class MessageOut(BaseModel):
     user_id: UUID
     username: str
     content: str
+    reply_to_id: Optional[UUID] = None
+    reply_to: Optional[ReplyToPreview] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -78,9 +93,11 @@ class MessageOut(BaseModel):
 
 # --- WebSocket Message Schemas ---
 class WSMessagePayload(BaseModel):
-    type: str  # "message", "typing", "user_joined", "user_left", "history"
+    type: str  # "message", "typing", "user_joined", "user_left", "history", "member_updated", "member_removed"
     username: Optional[str] = None
     user_id: Optional[str] = None
     content: Optional[str] = None
     timestamp: Optional[str] = None
+    reply_to_id: Optional[str] = None
+    reply_to: Optional[ReplyToPreview] = None
     messages: Optional[List[MessageOut]] = None

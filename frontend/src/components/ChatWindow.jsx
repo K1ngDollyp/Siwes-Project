@@ -1,15 +1,24 @@
 import React, { useEffect, useRef } from 'react';
-import { Hash, Users, Wifi, WifiOff, MessageSquare, UserPlus, Loader2 } from 'lucide-react';
+import { Hash, Users, MessageSquare, UserPlus, Loader2, Reply } from 'lucide-react';
 import MessageInput from './MessageInput';
 
 function formatRelativeTime(timestamp) {
   if (!timestamp) return '';
-  const date = new Date(timestamp);
+
+  // Append 'Z' to naive ISO strings without explicit timezone designation so JS parses as UTC
+  let str = String(timestamp);
+  if (!str.endsWith('Z') && !str.includes('+') && !str.includes('Z')) {
+    str = str + 'Z';
+  }
+
+  const date = new Date(str);
+  if (isNaN(date.getTime())) return '';
+
   const now = new Date();
   const diffInSeconds = Math.floor((now - date) / 1000);
 
-  if (diffInSeconds < 30) return 'just now';
-  if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+  if (diffInSeconds < 10) return 'just now';
+  if (diffInSeconds < 60) return `${Math.max(1, diffInSeconds)}s ago`;
   const diffInMinutes = Math.floor(diffInSeconds / 60);
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
   const diffInHours = Math.floor(diffInMinutes / 60);
@@ -45,7 +54,10 @@ export default function ChatWindow({
   onSendMessage,
   onTyping,
   onJoinRoom,
-  joining
+  joining,
+  replyingTo,
+  onReplyMessage,
+  onCancelReply
 }) {
   const messagesEndRef = useRef(null);
 
@@ -56,8 +68,8 @@ export default function ChatWindow({
 
   if (!room) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 p-8 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center mb-4">
+      <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 p-8 text-center select-none">
+        <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center mb-4 shadow-inner">
           <MessageSquare className="w-8 h-8" />
         </div>
         <h3 className="text-xl font-bold text-white mb-2">No Room Selected</h3>
@@ -71,7 +83,7 @@ export default function ChatWindow({
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-950 relative overflow-hidden">
       {/* Room Header */}
-      <div className="h-16 px-6 bg-slate-900/90 border-b border-slate-800/80 flex items-center justify-between z-10 backdrop-blur-md">
+      <div className="h-16 px-6 bg-slate-900/90 border-b border-slate-800/80 flex items-center justify-between z-10 backdrop-blur-md select-none">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400 font-bold">
             <Hash className="w-5 h-5" />
@@ -87,14 +99,12 @@ export default function ChatWindow({
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Online count */}
           <div className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/80">
             <Users className="w-4 h-4 text-indigo-400" />
             <span className="font-semibold">{onlineCount}</span>
             <span className="text-slate-400">online</span>
           </div>
 
-          {/* Connection status indicator */}
           <div className="flex items-center gap-2 text-xs bg-slate-950/60 px-3 py-1.5 rounded-xl border border-slate-800">
             <span
               className={`w-2.5 h-2.5 rounded-full ${
@@ -115,7 +125,7 @@ export default function ChatWindow({
       {/* Messages Stream */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {!room.is_member ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8">
+          <div className="h-full flex flex-col items-center justify-center text-center p-8 select-none">
             <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center mb-4">
               <UserPlus className="w-8 h-8" />
             </div>
@@ -133,7 +143,7 @@ export default function ChatWindow({
             </button>
           </div>
         ) : messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-500">
+          <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-500 select-none">
             <MessageSquare className="w-12 h-12 mb-3 text-slate-700" />
             <p className="text-sm">No messages in this room yet. Be the first to say hello!</p>
           </div>
@@ -144,7 +154,7 @@ export default function ChatWindow({
             return (
               <div
                 key={msg.id || index}
-                className={`flex items-start gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+                className={`group flex items-start gap-3 relative ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
               >
                 {/* Avatar Initials */}
                 <div
@@ -155,7 +165,7 @@ export default function ChatWindow({
                   {msg.username?.[0]?.toUpperCase() || 'U'}
                 </div>
 
-                {/* Message Bubble */}
+                {/* Message Content Container */}
                 <div
                   className={`max-w-[70%] flex flex-col ${
                     isMe ? 'items-end' : 'items-start'
@@ -171,15 +181,39 @@ export default function ChatWindow({
                   </div>
 
                   <div
-                    className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm ${
+                    className={`relative px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm ${
                       isMe
                         ? 'bg-indigo-600 text-white rounded-tr-none'
                         : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-tl-none'
                     }`}
                   >
+                    {/* Quoted Parent Reply Card */}
+                    {msg.reply_to && (
+                      <div className="mb-2 p-2 rounded-xl bg-black/25 border-l-2 border-indigo-400 text-xs">
+                        <div className="font-semibold text-indigo-300 mb-0.5">
+                          @{msg.reply_to.username}
+                        </div>
+                        <div className="text-slate-300 italic line-clamp-2">
+                          "{msg.reply_to.content}"
+                        </div>
+                      </div>
+                    )}
+
                     {msg.content}
                   </div>
                 </div>
+
+                {/* Hover Reply Button */}
+                <button
+                  type="button"
+                  onClick={() => onReplyMessage(msg)}
+                  className={`opacity-0 group-hover:opacity-100 p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-all cursor-pointer shadow-md self-center ${
+                    isMe ? 'mr-2' : 'ml-2'
+                  }`}
+                  title="Reply to message"
+                >
+                  <Reply className="w-3.5 h-3.5" />
+                </button>
               </div>
             );
           })
@@ -187,7 +221,7 @@ export default function ChatWindow({
 
         {/* Typing indicator */}
         {typingUsers && typingUsers.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-indigo-400 italic py-1 animate-pulse">
+          <div className="flex items-center gap-2 text-xs text-indigo-400 italic py-1 animate-pulse select-none">
             <span className="w-2 h-2 rounded-full bg-indigo-400" />
             <span>
               {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
@@ -203,6 +237,8 @@ export default function ChatWindow({
         onSendMessage={onSendMessage}
         onTyping={onTyping}
         disabled={!room.is_member || status !== 'connected'}
+        replyingTo={replyingTo}
+        onCancelReply={onCancelReply}
       />
     </div>
   );

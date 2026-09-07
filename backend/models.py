@@ -87,6 +87,7 @@ class RoomMember(Base):
     )
     room_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(20), default="member", nullable=False)  # "owner", "admin", "member"
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -102,9 +103,13 @@ class Message(Base):
     )
     room_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    reply_to_id: Mapped[Optional[uuid.UUID]] = mapped_column(GUID, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     room: Mapped["Room"] = relationship("Room", back_populates="messages")
     user: Mapped["User"] = relationship("User", back_populates="messages")
+    parent_message: Mapped[Optional["Message"]] = relationship("Message", remote_side=[id], back_populates="replies")
+    replies: Mapped[List["Message"]] = relationship("Message", back_populates="parent_message")
+
