@@ -186,7 +186,8 @@ export default function Chat({ currentUser, onLogout }) {
         typingUsers={typingUsers}
         status={status}
         onlineCount={onlineUsers.length}
-        currentUserId={currentUser?.id}
+        currentUser={currentUser}
+        members={roomMembers}
         onSendMessage={sendMessage}
         onTyping={sendTyping}
         onRequestJoin={handleRequestJoin}
@@ -195,6 +196,7 @@ export default function Chat({ currentUser, onLogout }) {
         onReplyMessage={(msg) =>
           setReplyingTo({
             id: msg.id,
+            user_id: msg.user_id,
             username: msg.username,
             content: msg.content,
           })

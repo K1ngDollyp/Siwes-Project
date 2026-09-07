@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Hash, Users, MessageSquare, UserPlus, Loader2, Reply, Clock, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Hash, Users, MessageSquare, UserPlus, Loader2, Reply, Clock, ShieldAlert, Copy, Check } from 'lucide-react';
 import MessageInput from './MessageInput';
 
 function formatRelativeTime(timestamp) {
@@ -42,13 +42,40 @@ function getAvatarColor(username) {
   return colors[Math.abs(hash) % colors.length];
 }
 
+function renderContentWithMentions(content, currentUsername) {
+  if (!content) return null;
+  const parts = content.split(/(@[a-zA-Z0-9_]+)/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith('@')) {
+      const tagUsername = part.slice(1);
+      const isSelf = currentUsername && tagUsername.toLowerCase() === currentUsername.toLowerCase();
+
+      return (
+        <span
+          key={index}
+          className={`inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded-md font-semibold text-xs transition-all ${
+            isSelf
+              ? 'bg-amber-400/25 text-amber-200 border border-amber-400/40 shadow-sm font-bold animate-pulse'
+              : 'bg-indigo-500/25 text-indigo-300 border border-indigo-500/30'
+          }`}
+        >
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
 export default function ChatWindow({
   room,
   messages,
   typingUsers,
   status,
   onlineCount,
-  currentUserId,
+  currentUser,
+  members = [],
   onSendMessage,
   onTyping,
   onRequestJoin,
@@ -59,7 +86,15 @@ export default function ChatWindow({
   pendingRequestsCount,
   onOpenRequestsModal
 }) {
+  const [copiedMsgId, setCopiedMsgId] = useState(null);
   const messagesEndRef = useRef(null);
+
+  const handleCopyMessage = (msg) => {
+    if (!msg?.content) return;
+    navigator.clipboard.writeText(msg.content);
+    setCopiedMsgId(msg.id);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -187,7 +222,7 @@ export default function ChatWindow({
           </div>
         ) : (
           messages.map((msg, index) => {
-            const isMe = msg.user_id === currentUserId;
+            const isMe = msg.user_id === currentUser?.id;
 
             return (
               <div
@@ -226,7 +261,7 @@ export default function ChatWindow({
                     {msg.reply_to && (
                       <div className="mb-2 p-2 rounded-xl bg-black/25 border-l-2 border-indigo-400 text-xs">
                         <div className="font-semibold text-indigo-300 mb-0.5">
-                          @{msg.reply_to.username}
+                          {msg.reply_to.username?.toLowerCase() === currentUser?.username?.toLowerCase() ? 'You' : `@${msg.reply_to.username}`}
                         </div>
                         <div className="text-slate-300 italic line-clamp-2">
                           "{msg.reply_to.content}"
@@ -234,33 +269,56 @@ export default function ChatWindow({
                       </div>
                     )}
 
-                    {msg.content}
+                    {renderContentWithMentions(msg.content, currentUser?.username)}
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onReplyMessage(msg)}
-                  className={`opacity-0 group-hover:opacity-100 p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-all cursor-pointer shadow-md self-center ${
+                <div
+                  className={`opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all self-center ${
                     isMe ? 'mr-2' : 'ml-2'
                   }`}
-                  title="Reply to message"
                 >
-                  <Reply className="w-3.5 h-3.5" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyMessage(msg)}
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-all cursor-pointer shadow-md"
+                    title={copiedMsgId === msg.id ? 'Copied!' : 'Copy message text'}
+                  >
+                    {copiedMsgId === msg.id ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onReplyMessage(msg)}
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-all cursor-pointer shadow-md"
+                    title="Reply to message"
+                  >
+                    <Reply className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             );
           })
         )}
 
-        {typingUsers && typingUsers.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-indigo-400 italic py-1 animate-pulse select-none">
-            <span className="w-2 h-2 rounded-full bg-indigo-400" />
-            <span>
-              {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
-            </span>
-          </div>
-        )}
+        {(() => {
+          const otherTypingUsers = (typingUsers || []).filter(
+            (username) => username !== currentUser?.username
+          );
+          if (otherTypingUsers.length === 0) return null;
+          return (
+            <div className="flex items-center gap-2 text-xs text-indigo-400 italic py-1 animate-pulse select-none">
+              <span className="w-2 h-2 rounded-full bg-indigo-400" />
+              <span>
+                {otherTypingUsers.join(', ')} {otherTypingUsers.length === 1 ? 'is' : 'are'} typing...
+              </span>
+            </div>
+          );
+        })()}
 
         <div ref={messagesEndRef} />
       </div>
@@ -272,6 +330,8 @@ export default function ChatWindow({
         disabled={!room.is_member || status !== 'connected'}
         replyingTo={replyingTo}
         onCancelReply={onCancelReply}
+        members={members}
+        currentUserId={currentUser?.id}
       />
     </div>
   );
