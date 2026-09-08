@@ -67,6 +67,7 @@ class Room(Base):
     )
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    is_private: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -97,9 +97,22 @@ export default function Chat({ currentUser, onLogout }) {
   }, [activeRoom?.id, activeRoom?.user_role, loadRoomMembers, loadJoinRequests]);
 
   // Create room handler
-  const handleCreateRoom = async (name, description) => {
-    const newRoom = await api.createRoom(name, description);
+  const handleCreateRoom = async (name, description, isPrivate = false) => {
+    const newRoom = await api.createRoom(name, description, isPrivate);
     await loadRooms(newRoom.id);
+  };
+
+  // Leave room handler
+  const handleLeaveRoom = async (roomId) => {
+    if (!roomId || !currentUser?.id) return;
+    try {
+      await api.removeMember(roomId, currentUser.id);
+      setActiveRoom(null);
+      await loadRooms();
+    } catch (err) {
+      console.error('Failed to leave room:', err);
+      alert(err.message || 'Failed to leave room.');
+    }
   };
 
   // Submit Join Request handler
@@ -204,6 +217,7 @@ export default function Chat({ currentUser, onLogout }) {
         onCancelReply={() => setReplyingTo(null)}
         pendingRequestsCount={joinRequests.length}
         onOpenRequestsModal={() => setIsRequestsModalOpen(true)}
+        onLeaveRoom={handleLeaveRoom}
       />
 
       {/* Right Sidebar - Online Users in Active Room */}

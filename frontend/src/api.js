@@ -55,10 +55,10 @@ export const api = {
   // Rooms API
   getRooms: () => request('/api/rooms'),
 
-  createRoom: (name, description) =>
+  createRoom: (name, description, isPrivate = false) =>
     request('/api/rooms', {
       method: 'POST',
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, description, is_private: isPrivate }),
     }),
 
   requestToJoinRoom: (roomId) =>

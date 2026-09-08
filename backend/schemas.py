@@ -35,12 +35,14 @@ class Token(BaseModel):
 class RoomCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
+    is_private: bool = False
 
 
 class RoomOut(BaseModel):
     id: UUID
     name: str
     description: Optional[str] = None
+    is_private: bool = False
     created_by: Optional[UUID] = None
     created_at: datetime
     member_count: int = 0

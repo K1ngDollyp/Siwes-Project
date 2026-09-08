@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Users, MessageSquare, UserPlus, Loader2, Reply, Clock, ShieldAlert, Copy, Check } from 'lucide-react';
+import { Hash, Users, MessageSquare, UserPlus, Loader2, Reply, Clock, ShieldAlert, Copy, Check, LogOut } from 'lucide-react';
 import MessageInput from './MessageInput';
 
 function formatRelativeTime(timestamp) {
@@ -84,7 +84,8 @@ export default function ChatWindow({
   onReplyMessage,
   onCancelReply,
   pendingRequestsCount,
-  onOpenRequestsModal
+  onOpenRequestsModal,
+  onLeaveRoom
 }) {
   const [copiedMsgId, setCopiedMsgId] = useState(null);
   const messagesEndRef = useRef(null);
@@ -101,6 +102,7 @@ export default function ChatWindow({
   }, [messages, typingUsers]);
 
   const isAdminOrOwner = room?.user_role === 'owner' || room?.user_role === 'admin';
+  const isOwner = room?.user_role === 'owner';
 
   if (!room) {
     return (
@@ -149,6 +151,22 @@ export default function ChatWindow({
                   {pendingRequestsCount}
                 </span>
               )}
+            </button>
+          )}
+
+          {/* Leave Room Button */}
+          {room.is_member && !isOwner && onLeaveRoom && (
+            <button
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to leave #${room.name}?`)) {
+                  onLeaveRoom(room.id);
+                }
+              }}
+              className="flex items-center gap-1.5 text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+              title="Leave Room"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Leave</span>
             </button>
           )}
 

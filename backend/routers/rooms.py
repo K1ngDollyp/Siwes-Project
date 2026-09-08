@@ -55,6 +55,7 @@ async def list_rooms(
             id=room.id,
             name=room.name,
             description=room.description,
+            is_private=room.is_private,
             created_by=room.created_by,
             created_at=room.created_at,
             member_count=count,
@@ -84,6 +85,7 @@ async def create_room(
     new_room = Room(
         name=room_in.name,
         description=room_in.description,
+        is_private=room_in.is_private,
         created_by=current_user.id
     )
     db.add(new_room)
@@ -102,6 +104,7 @@ async def create_room(
         id=new_room.id,
         name=new_room.name,
         description=new_room.description,
+        is_private=new_room.is_private,
         created_by=new_room.created_by,
         created_at=new_room.created_at,
         member_count=1,
@@ -117,7 +120,7 @@ async def request_to_join_room(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Submits a join request to enter a room. Requires Admin approval."""
+    """Joins a room immediately if public, or submits a pending join request if private."""
     room_result = await db.execute(select(Room).where(Room.id == room_id))
     room = room_result.scalar_one_or_none()
     if not room:
@@ -139,7 +142,35 @@ async def request_to_join_room(
             detail="User is already a member of this room"
         )
 
-    # Check if existing request is pending
+    # Public Rooms: Join immediately without requiring approval
+    if not room.is_private:
+        new_member = RoomMember(
+            room_id=room_id,
+            user_id=current_user.id,
+            role="member"
+        )
+        db.add(new_member)
+        await db.commit()
+
+        count_res = await db.execute(
+            select(func.count(RoomMember.id)).where(RoomMember.room_id == room_id)
+        )
+        count = count_res.scalar_one()
+
+        return RoomOut(
+            id=room.id,
+            name=room.name,
+            description=room.description,
+            is_private=room.is_private,
+            created_by=room.created_by,
+            created_at=room.created_at,
+            member_count=count,
+            is_member=True,
+            user_role="member",
+            join_request_status=None
+        )
+
+    # Private Rooms: Create or update pending join request
     existing_req = await db.execute(
         select(RoomJoinRequest).where(
             RoomJoinRequest.room_id == room_id,
@@ -174,6 +205,7 @@ async def request_to_join_room(
         id=room.id,
         name=room.name,
         description=room.description,
+        is_private=room.is_private,
         created_by=room.created_by,
         created_at=room.created_at,
         member_count=count,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Hash, Users, LogOut, X, Loader2, Sparkles } from 'lucide-react';
+import { Plus, Search, Hash, Users, LogOut, X, Loader2, Sparkles, Lock, Globe } from 'lucide-react';
 
 export default function RoomList({
   rooms,
@@ -16,6 +16,7 @@ export default function RoomList({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomDesc, setNewRoomDesc] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,9 +32,10 @@ export default function RoomList({
     setError('');
 
     try {
-      await onCreateRoom(newRoomName.trim(), newRoomDesc.trim());
+      await onCreateRoom(newRoomName.trim(), newRoomDesc.trim(), isPrivate);
       setNewRoomName('');
       setNewRoomDesc('');
+      setIsPrivate(false);
       setIsModalOpen(false);
     } catch (err) {
       setError(err.message || 'Failed to create room.');
@@ -113,10 +115,21 @@ export default function RoomList({
                         : 'bg-slate-800 text-slate-400 group-hover:text-slate-200'
                     }`}
                   >
-                    <Hash className="w-4 h-4" />
+                    {room.is_private ? <Lock className="w-4 h-4 text-amber-400" /> : <Hash className="w-4 h-4" />}
                   </div>
                   <div className="truncate">
-                    <div className="font-semibold text-sm truncate">{room.name}</div>
+                    <div className="font-semibold text-sm truncate flex items-center gap-1.5">
+                      <span className="truncate">{room.name}</span>
+                      {room.is_private ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase">
+                          Private
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase">
+                          Public
+                        </span>
+                      )}
+                    </div>
                     {room.description && (
                       <div className="text-xs text-slate-400 truncate">{room.description}</div>
                     )}
@@ -202,12 +215,56 @@ export default function RoomList({
                   Description (Optional)
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={newRoomDesc}
                   onChange={(e) => setNewRoomDesc(e.target.value)}
                   placeholder="Brief summary of room topics..."
                   className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
                 />
+              </div>
+
+              {/* Room Privacy Choice */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  Room Access Type
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsPrivate(false)}
+                    className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                      !isPrivate
+                        ? 'bg-emerald-600/20 border-emerald-500 text-white shadow-md'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-bold text-sm">
+                      <Globe className="w-4 h-4 text-emerald-400" />
+                      <span>Public Room</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 mt-1">
+                      Anyone can join instantly
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsPrivate(true)}
+                    className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                      isPrivate
+                        ? 'bg-amber-600/20 border-amber-500 text-white shadow-md'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-bold text-sm">
+                      <Lock className="w-4 h-4 text-amber-400" />
+                      <span>Private Room</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 mt-1">
+                      Requires admin approval to enter
+                    </span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
