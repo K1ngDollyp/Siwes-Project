@@ -20,7 +20,10 @@ engine_kwargs = {}
 if "sqlite" in DATABASE_URL:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
 elif "postgresql" in DATABASE_URL:
-    engine_kwargs["connect_args"] = {"statement_cache_size": 0}
+    engine_kwargs["connect_args"] = {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0
+    }
 
 async_engine = create_async_engine(DATABASE_URL, echo=False, **engine_kwargs)
 
